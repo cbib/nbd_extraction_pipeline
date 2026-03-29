@@ -1,0 +1,15 @@
+# filepath: profiles/default/config.yaml
+executor: slurm
+jobs: 100
+keep-going: false
+#rerun-incomplete: true
+printshellcmds: true
+scheduler: greedy
+use-conda: true
+verbose: false
+latency-wait: 40
+benchmark-extended: true
+default_resources:
+  mem_mb_per_cpu: 5000
+
+slurm-delete-logfiles-older-than: 0

@@ -1,0 +1,84 @@
+# Non-B DNA Pipeline Configuration
+# =================================
+
+# Datasets to analyze
+datasets:
+  #- toy
+  - gencode.v47
+
+# GFA motif types to analyze
+gfa_motifs:
+  - APR   # A-phased repeats
+  - DR    # Direct repeats
+  - g4Discovery    # G-quadruplexes
+  - IR    # Inverted repeats
+  - MR    # Mirror repeats
+  - STR   # Short tandem repeats
+  - TRI   # Triplex-forming sequences
+  - Z     # Z-DNA forming sequences
+
+# Analysis options
+analysis:
+  # Run basic analysis (parse_overlaps.py)
+  run_basic: true
+
+  # Run extended analysis (comprehensive features + stats)
+  run_extended: true
+
+  # Keep transcripts not classified as coding or lncRNA
+  keep_other_transcripts: false
+
+  # Statistical significance threshold
+  alpha: 0.05
+
+  # Multiple testing correction method
+  correction_method: "fdr"  # Options: "fdr", "bonferroni"
+
+# Resource allocation
+resources:
+  # Feature extraction
+  feature_extraction:
+    threads: 1
+    mem_mb: 10000
+    runtime_minutes: 30
+
+  # Statistical analysis
+  statistical_analysis:
+    threads: 4  # Use multiple cores for Random Forest
+    mem_mb: 10000
+    runtime_minutes: 10
+
+  # Basic analysis (per motif)
+  basic_analysis:
+    threads: 1
+    mem_mb: 10000
+    runtime_minutes: 10
+
+# Output options
+output:
+  # Save resolved elements BED files
+  save_resolved_elements: true
+
+  # Generate visualizations
+  create_plots: true
+
+  # Create summary report
+  create_summary: true
+
+# Paths (optional - defaults shown)
+paths:
+  # Input data directory
+  # data_dir: "data"
+
+  # Results directory
+  # results_dir: "results"
+
+  # Logs directory
+  # logs_dir: "logs"
+
+# Upstream tool configuration
+upstream:
+  assembly_gz: "resources/GRCh38.p14.genome.fa.gz"
+  assembly_fa: "resources/GRCh38.p14.genome.fa"
+  gfa_prefix: "GCA_000001405.15_GRCh38_no_alt_analysis_set"
+  tools_dir: "software"

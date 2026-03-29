@@ -1,0 +1,11 @@
+name: gfa-build
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Only needs a C compiler and standard build tools — no external libs
+  - gcc_linux-64
+  - make
+  - git
+  # gzip/sort for post-processing TSV → BED
+  - coreutils

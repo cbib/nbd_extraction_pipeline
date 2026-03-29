@@ -1,0 +1,154 @@
+# nbd_pipeline_manifest.yaml
+#
+# Reusable manifest of the Non-B DNA Snakemake pipeline.
+# Captures entry points, rule-file dependencies, rules, output patterns,
+# known bugs, and wildcard definitions.
+#
+# Both humans and machines can consume this file:
+#   import yaml; m = yaml.safe_load(open("nbd_pipeline_manifest.yaml"))
+#   m["entry_points"]        → runnable entry points
+#   m["include_graph"]       → file-level DAG (adjacency list)
+#   m["modules"]             → per-file rule catalogue
+#   m["known_bugs"]          → actionable issues before next run
+
+meta:
+  project: LNClassifier / Non-B DNA Pipeline
+  description: "Build transcript/exon BEDs from GTF; basic path uses legacy GTF intersects, extended path uses exon-BED intersects with per-transcript exonic length aggregation"
+  last_updated: "2026-03-19"
+  configs:
+    integrated: config/config.yaml
+
+# ---------------------------------------------------------------------------
+# Entry points — top-level Snakefiles you can run directly
+# ---------------------------------------------------------------------------
+entry_points:
+  integrated:
+    file:        Snakefile
+    config:      config/config.yaml
+    target_rule: all
+    status:      active
+    description: >
+      Full pipeline: data prep → per-motif basic analysis → extended feature
+      extraction, contingency tests, and statistical analysis.
+    run_with:    "snakemake --snakefile Snakefile --configfile config/config.yaml"
+
+  upstream:
+    file:        Snakefile
+    config:      config/config.yaml
+    target_rule: all_upstream
+    status:      active_separate
+    description: >
+      Upstream-only target: reproduce raw Non-B DNA BED files from the
+      GRCh38 assembly FASTA (gfa × 7 motifs + g4Discovery × 1).
+    run_with:    "snakemake --snakefile Snakefile --configfile config/config.yaml all_upstream"
+
+
+# ---------------------------------------------------------------------------
+# Include graph — adjacency list of file-level include dependencies
+# ---------------------------------------------------------------------------
+include_graph:
+  "Snakefile":
+    - workflow/rules/common.smk
+    - workflow/rules/extended_analysis.smk
+    - workflow/rules/upstream.smk
+
+# ---------------------------------------------------------------------------
+# Modules — per-file catalogue: status, role, entry rule, and rule list
+#
+# Rule fields:
+#   name   — rule name exactly as written in the file
+#   type   — one of: aggregation | data_prep | preprocessing | analysis |
+#             setup | utility | checkpoint
+#   output — representative primary output pattern (wildcards use {name})
+# ---------------------------------------------------------------------------
+modules:
+
+  # Integrated entry point (rules defined directly in Snakefile)
+  snakefile_integrated:
+    file:       Snakefile
+    status:     active
+    role:       pipeline_orchestrator
+    entry_rule: all
+    rules:
+      - { name: all,                       type: aggregation,  output: null }
+      - { name: create_transcripts_bed,    type: data_prep,    output: "results/{dataset}/transcripts.bed" }
+      - { name: create_exons_bed,          type: data_prep,    output: "results/{dataset}/exons.bed" }
+      - { name: create_biotypes_from_fasta, type: data_prep,   output: "results/{dataset}/biotypes.tsv" }
+      - { name: prepare_transcript_ids,    type: data_prep,    output: "results/{dataset}/annotation/pc_transcript_ids.txt" }
+      - { name: basic_motif_analysis,      type: analysis,     output: "results/{dataset}/transcript_gfa.{motif}_summary.tsv" }
+      - { name: create_summary_report,     type: aggregation,  output: "results/{dataset}/complete_analysis_report.txt" }
+      - { name: clean_results,             type: utility,      output: null }
+      - { name: list_outputs,              type: utility,      output: null }
+
+  common:
+    file:   workflow/rules/common.smk
+    status: active
+    role:   shared_helpers_and_utility_rules
+    note:   "Also defines Python helper functions get_motif_filename(), get_dataset_motif_bed(), get_isect_bed(), and get_extended_isect_bed() used across rule files."
+    rules:
+      - { name: gunzip, type: preprocessing, output: "{file}" }
+
+  extended_analysis:
+    file:        workflow/rules/extended_analysis.smk
+    note:        "Extended pipeline now uses exon-BED-based intersections and exonic transcript lengths; parse_overlaps.py remains legacy/basic only."
+    status:      active
+    role:        extended_feature_and_statistical_analysis
+    entry_rule:  extended_analysis_all
+    rules:
+      - { name: analyze_motif_overlaps,        type: analysis,    output: "results/overlap_analysis/{motif}_overlap_report.txt" }
+      - { name: analyze_all_motif_overlaps,    type: aggregation, output: "results/overlap_analysis/all_motifs_analyzed.flag" }
+      - { name: extended_bedtools_intersect,   type: analysis,    output: "results/{sample}/extended_analysis/isect_{motif_file}.bed" }
+      - { name: extended_feature_extraction,   type: analysis,    output: "results/{sample}/extended_analysis/features_nonb_features.csv" }
+      - { name: extended_contingency_analysis, type: analysis,    output: "results/{sample}/extended_analysis/contingency_motif_type_chi_square.csv" }
+      - { name: extended_statistical_analysis, type: analysis,    output: "results/{sample}/extended_analysis/statistics_univariate_tests.csv" }
+      - { name: extended_analysis_all,         type: aggregation, output: "results/{sample}/extended_analysis/analysis_complete.txt" }
+
+  upstream:
+    file:        workflow/rules/upstream.smk
+    status:      active
+    role:        upstream_nonb_bed_generation
+    entry_rule:  all_upstream
+    note:        "Reproduces the pre-computed BED files from the GRCh38 assembly FASTA. Only needs to run once."
+    rules:
+      - { name: all_upstream,            type: aggregation,  output: null }
+      - { name: decompress_assembly,     type: data_prep,    output: "resources/GRCh38.p14.genome.fa" }
+      - { name: install_gfa,             type: setup,        output: "software/non-B_gfa/gfa" }
+      - { name: install_g4discovery,     type: setup,        output: "software/g4Discovery.PanSN/g4Discovery.py" }
+      - { name: run_gfa,                 type: analysis,     output: "results/gfa_raw/GCA_000001405.15_GRCh38_no_alt_analysis_set_{motif}.tsv" }
+      - { name: gfa_tsv_to_bed,          type: preprocessing, output: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.gfa.{motif}.bed" }
+      - { name: gfa_extract_triplex,     type: preprocessing, output: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.gfa.TRI.bed" }
+      - { name: run_g4discovery,         type: analysis,     output: "results/g4discovery_raw/GCA_000001405.15_GRCh38_no_alt_analysis_set.g4Discovery.bed.gz" }
+      - { name: g4discovery_clean_chrom, type: preprocessing, output: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.g4Discovery_clean.bed" }
+
+  # Legacy root Snakefile rules (broken; listed for reference)
+  snakefile_legacy:
+    file:   Snakefile
+    status: broken
+    role:   legacy_bedtools_overlap_pipeline
+    rules:
+      - { name: create_gtf_toy,               type: data_prep,    output: "resources/toy/toy_{chr}.gtf" }
+      - { name: create_bed_toy,               type: data_prep,    output: "resources/toy/toy_{nbd_type}_{chr}.{ext}" }
+      - { name: clean_chrom,                  type: preprocessing, output: "{file}_clean.bed" }
+      - { name: get_coding_class_ids,         type: data_prep,    output: "results/pc_transcript_ids.txt" }
+      - { name: bedtools_intersect,           type: analysis,     output: "results/{sample}/isect_{nbd_type}.bed" }
+      - { name: parse_transcript_nbd_overlap, type: analysis,     output: "results/{sample}/transcript_{nbd_type}_summary.tsv" }
+
+# ---------------------------------------------------------------------------
+# Wildcards — definitions of all {wildcard} tokens used across rules
+# ---------------------------------------------------------------------------
+wildcards:
+  dataset:   "Dataset identifier: 'toy' or 'gencode.v47' (Snakefile)"
+  sample:    "Dataset identifier in extended_analysis.smk — same semantic as {dataset}; name inconsistency is a known issue"
+  motif:     "GFA motif short name: APR | DR | IR | MR | STR | TRI | Z (used in Snakefile and upstream.smk)"
+  nbd_type:  >
+    Non-B DNA type as used in legacy Snakefile / samples.yaml config:
+    'g4Discovery' or 'gfa.<motif>' (e.g. 'gfa.APR').
+    This is the prefixed form; Snakefile uses bare {motif} instead.
+  chr:       "Chromosome identifier for toy dataset extraction (e.g. 'chr22')"
+  file:      "File path stem used in generic rules: gunzip ({file}.gz → {file}), clean_chrom ({file}.bed → {file}_clean.bed)"
+  ext:       "File extension in toy rule (gtf or bed)"
+
+# ---------------------------------------------------------------------------
+# Known bugs — issues that must be resolved before the next pipeline run
+# ---------------------------------------------------------------------------
+known_bugs:

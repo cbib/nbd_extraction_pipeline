@@ -1,0 +1,27 @@
+samples:
+  toy:
+    gtf: resources/toy/toy_chr22.gtf
+    bed: resources/toy/toy_{nbd_type}_chr22_clean.bed
+    full_bed: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.{nbd_type}_clean.bed"
+    # "exons" (default) | "full_transcripts" / "transcripts" (alias)
+    feature_source: "exons"
+
+  gencode.v47.exons:
+    gtf: resources/gencode.v47.annotation.gtf
+    bed: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.{nbd_type}_clean.bed"
+    feature_source: "exons"
+
+  gencode.v47.transcripts:
+    gtf: resources/gencode.v47.annotation.gtf
+    bed: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.{nbd_type}_clean.bed"
+    feature_source: "transcripts"
+
+nbd_types:
+  - g4Discovery
+  - gfa.APR
+  - gfa.DR
+  - gfa.IR
+  - gfa.MR
+  - gfa.STR
+  - gfa.TRI
+  - gfa.Z
