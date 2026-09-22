@@ -4,7 +4,7 @@
 # Datasets to analyze
 datasets:
   #- toy
-  - gencode.v47
+  - gencode.v47.transcripts
 
 # GFA motif types to analyze
 gfa_motifs:
