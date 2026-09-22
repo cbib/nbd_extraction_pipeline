@@ -27,7 +27,7 @@ rule analyze_motif_overlaps:
     output:
         report = "results/overlap_analysis/{motif}_overlap_report.txt"
     conda:
-        "lnc-datasets"
+        "../envs/nonb_analysis.yaml",
     log:
         "logs/overlap_analysis/{motif}.log"
     shell:
@@ -137,6 +137,8 @@ rule extended_feature_extraction:
         exon_mode = lambda wildcards: get_feature_source(wildcards.dataset) == "exons",
     log:
         "logs/{dataset}/extended_feature_extraction.log",
+    conda:
+        "../envs/nonb_analysis.yaml",
     threads: 1
     resources:
         mem_mb = 100000,
@@ -164,6 +166,8 @@ rule extended_contingency_analysis:
         report = "results/{dataset}/extended_analysis/contingency_contingency_report.txt",
     params:
         output_prefix = "results/{dataset}/extended_analysis/contingency",
+    conda:
+        "../envs/nonb_analysis.yaml",
     log:
         "logs/{dataset}/extended_contingency_analysis.log",
     threads: 1
@@ -194,6 +198,8 @@ rule extended_statistical_analysis:
         report = "results/{dataset}/extended_analysis/statistics_statistical_report.txt",
     params:
         output_prefix = "results/{dataset}/extended_analysis/statistics",
+    conda:
+        "../envs/nonb_analysis.yaml",
     log:
         "logs/{dataset}/extended_statistical_analysis.log",
     threads: 20  # Use all available cores for Random Forest

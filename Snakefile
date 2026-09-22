@@ -9,14 +9,19 @@
 # Configuration
 configfile: "config/config.yaml"
 configfile: "config/samples.yaml"
+configfile: "config/toy.yaml"
 
 # Global variables
 DATASETS = config.get("datasets", ["toy", "gencode.v47"])
 
 GFA_MOTIFS = ["APR", "DR", "g4Discovery_plus", "g4Discovery_minus", "IR", "MR", "STR", "TRI", "Z"]
+TOY_RESOURCE_PROVENANCE = (
+    "resources/toy/toy_provenance.yaml" if "toy" in DATASETS else []
+)
 
 # Include rule files
 include: "workflow/rules/common.smk"
+include: "workflow/rules/toy.smk"
 include: "workflow/rules/extended_analysis.smk"
 include: "workflow/rules/upstream.smk"
 
@@ -33,6 +38,7 @@ rule all:
     Default target: Run complete pipeline (basic + extended analysis).
     """
     input:
+        TOY_RESOURCE_PROVENANCE,
         # Basic analysis outputs
         expand(
             "results/{dataset}/transcript_gfa.{motif}_summary.tsv",
@@ -123,21 +129,26 @@ rule create_exons_bed:
 
 rule create_biotypes_from_fasta:
     """
-    Create biotypes TSV file from protein-coding and lncRNA FASTA files.
-    Extracts transcript IDs and assigns transcript_type based on source file.
+    Create biotypes TSV file from the configured annotation sources.
+    Toy annotations are read from GTF; full datasets use transcript FASTAs.
 
     Output format:
     - transcript_id_base: Transcript ID without version (e.g., ENST00000456328)
     - transcript_type: 'protein_coding' or 'lncRNA'
     """
     input:
+        gtf = lambda wildcards: (
+            config["samples"][wildcards.dataset]["gtf"]
+            if wildcards.dataset == "toy"
+            else []
+        ),
         coding_fasta = lambda wildcards: (
-            "results/pc_transcript_ids.txt"
+            []
             if wildcards.dataset == "toy"
             else "resources/gencode.v47.pc_transcripts.fa"
         ),
         lncRNA_fasta = lambda wildcards: (
-            "results/lncrna_transcript_ids.txt"
+            []
             if wildcards.dataset == "toy"
             else "resources/gencode.v47.lncRNA_transcripts.fa"
         ),
@@ -152,8 +163,15 @@ rule create_biotypes_from_fasta:
         {{
             echo -e "transcript_id_base\\ttranscript_type"
 
-            # Extract protein-coding transcript IDs and label them
-            if [[ -f {input.coding_fasta} ]]; then
+            if [[ "{wildcards.dataset}" == "toy" ]]; then
+                awk -F'\\t' '$3 == "transcript" {{
+                    match($9, /transcript_id "([^"]+)"/, transcript_id)
+                    match($9, /transcript_type "([^"]+)"/, transcript_type)
+                    if (transcript_id[1] != "" && transcript_type[1] != "")
+                        {{ split(transcript_id[1], id, "."); print id[1] "\\t" transcript_type[1] }}
+                }}' {input.gtf}
+            else
+                # Extract protein-coding transcript IDs and label them
                 if grep -q ">" {input.coding_fasta} 2>/dev/null; then
                     # It's a FASTA file
                     grep ">" {input.coding_fasta} | cut -d'|' -f 1 | sed 's/>//g' | \
@@ -162,10 +180,8 @@ rule create_biotypes_from_fasta:
                     # It's a plain ID list
                     awk '{{split($1, a, "."); print a[1] "\\tprotein_coding"}}' {input.coding_fasta}
                 fi
-            fi
 
-            # Extract lncRNA transcript IDs and label them
-            if [[ -f {input.lncRNA_fasta} ]]; then
+                # Extract lncRNA transcript IDs and label them
                 if grep -q ">" {input.lncRNA_fasta} 2>/dev/null; then
                     # It's a FASTA file
                     grep ">" {input.lncRNA_fasta} | cut -d'|' -f 1 | sed 's/>//g' | \
