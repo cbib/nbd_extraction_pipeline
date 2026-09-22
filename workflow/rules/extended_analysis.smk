@@ -238,3 +238,14 @@ rule extended_analysis_all:
         }} > {output.summary} 2>&1
         cp {output.summary} {log}
         """
+
+# Default target to run extended analysis
+rule extended_analysis_all_datasets:
+    """
+    Default target to run the complete extended analysis pipeline for all datasets.
+    """
+    input:
+        expand(
+            "results/{dataset}/extended_analysis/analysis_complete.txt",
+            dataset=config["datasets"]
+        )
