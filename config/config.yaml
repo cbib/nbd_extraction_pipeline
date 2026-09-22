@@ -10,7 +10,8 @@ datasets:
 gfa_motifs:
   - APR   # A-phased repeats
   - DR    # Direct repeats
-  - g4Discovery    # G-quadruplexes
+  - g4Discovery_plus   # G-quadruplexes, + strand
+  - g4Discovery_minus  # G-quadruplexes, − strand
   - IR    # Inverted repeats
   - MR    # Mirror repeats
   - STR   # Short tandem repeats

@@ -22,7 +22,7 @@ from nonb_feature_extractor import NonBFeatureExtractor
 
 # Get parameters from Snakemake
 input_dir = snakemake.params.input_dir
-sample = snakemake.wildcards.sample
+sample = snakemake.wildcards.dataset
 transcripts_bed = str(snakemake.input.transcripts_bed)
 biotypes_file = (
     str(snakemake.input.biotypes) if hasattr(snakemake.input, "biotypes") else None
@@ -45,7 +45,8 @@ logger.info(f"Exon mode: {exon_mode}")
 intersections = {
     "APR": str(snakemake.input.apr),
     "DR": str(snakemake.input.dr),
-    "GQ": str(snakemake.input.gq),  # Use GQ internally, maps to g4Discovery file
+    "GQ_PLUS": str(snakemake.input.gq_plus),
+    "GQ_MINUS": str(snakemake.input.gq_minus),
     "IR": str(snakemake.input.ir),
     "MR": str(snakemake.input.mr),
     "STR": str(snakemake.input._str),
@@ -55,7 +56,8 @@ intersections = {
 
 # Map internal motif names to output file names
 motif_name_mapping = {
-    "GQ": "g4Discovery",  # Internal name GQ maps to output name g4Discovery
+    "GQ_PLUS": "g4Discovery_plus",
+    "GQ_MINUS": "g4Discovery_minus",
 }
 
 logger.info(

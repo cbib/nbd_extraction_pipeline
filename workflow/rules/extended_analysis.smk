@@ -3,7 +3,7 @@
 # Comprehensive feature extraction and statistical analysis
 # Organized by execution order
 
-GFA_MOTIFS = ["APR", "DR", "g4Discovery", "IR", "MR", "STR", "TRI", "Z"]
+GFA_MOTIFS = ["APR", "DR", "g4Discovery_plus", "g4Discovery_minus", "IR", "MR", "STR", "TRI", "Z"]
 
 # ============================================================================
 # EXECUTION ORDER 1: Preprocessing - Overlap Analysis
@@ -23,7 +23,7 @@ rule analyze_motif_overlaps:
     which strategy to apply (merge, keep longest, sweep-line, etc.).
     """
     input:
-        bed = lambda wildcards: f"resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.{get_motif_filename(wildcards.motif)}_clean.bed"
+        bed = lambda wildcards: f"{_NBD}.{get_motif_filename(wildcards.motif)}_clean.bed"
     output:
         report = "results/overlap_analysis/{motif}_overlap_report.txt"
     conda:
@@ -81,7 +81,7 @@ rule extended_bedtools_intersect:
         mem_mb = 10000,
         runtime = 60,
     wildcard_constraints:
-        motif_file = r"g4Discovery|gfa\.(APR|DR|IR|MR|STR|TRI|Z)",
+        motif_file = r"g4Discovery(_plus|_minus)?|gfa\.(APR|DR|IR|MR|STR|TRI|Z)",
     wrapper:
         "v7.3.0/bio/bedtools/intersect"
 
@@ -112,8 +112,11 @@ rule extended_feature_extraction:
         # Explicit BED-based intersection files for the extended pipeline.
         apr = lambda wildcards: get_extended_isect_bed(wildcards.dataset, "APR"),
         dr = lambda wildcards: get_extended_isect_bed(wildcards.dataset, "DR"),
-        gq = lambda wildcards: get_extended_isect_bed(
-            wildcards.dataset, "g4Discovery"
+        gq_plus = lambda wildcards: get_extended_isect_bed(
+            wildcards.dataset, "g4Discovery_plus"
+        ),
+        gq_minus = lambda wildcards: get_extended_isect_bed(
+            wildcards.dataset, "g4Discovery_minus"
         ),
         ir = lambda wildcards: get_extended_isect_bed(wildcards.dataset, "IR"),
         mr = lambda wildcards: get_extended_isect_bed(wildcards.dataset, "MR"),

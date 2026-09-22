@@ -15,8 +15,8 @@ def get_motif_filename(motif):
         - 'gfa.{motif}' for all other motifs
     """
     motif = str(motif)
-    if motif == "g4Discovery":
-        return "g4Discovery"
+    if motif in ("g4Discovery", "g4Discovery_plus", "g4Discovery_minus"):
+        return motif
     if motif.startswith("gfa."):
         return motif
     else:
@@ -33,10 +33,7 @@ def get_dataset_motif_bed(dataset, motif):
     filename = get_motif_filename(motif)
     if dataset == "toy":
         return f"resources/toy/toy_{filename}_chr22_clean.bed"
-    return (
-        "resources/GRCh38_NonBDNA/"
-        f"GCA_000001405.15_GRCh38_no_alt_analysis_set.{filename}_clean.bed"
-    )
+    return f"{_NBD}.{filename}_clean.bed"
 
 
 def get_isect_bed(dataset, motif):
@@ -65,6 +62,28 @@ def get_extended_isect_bed(dataset, motif):
 # ============================================================================
 # Common Rules
 # ============================================================================
+
+_ASSEMBLY_PREFIX = config["upstream"]["assembly_prefix"]
+_NBD_DIR = config["upstream"]["nbd_dir"]
+_NBD = f"{_NBD_DIR}/{_ASSEMBLY_PREFIX}"
+
+
+rule g4discovery_split_strands:
+    """Split the cleaned G4 BED into plus- and minus-strand files (column 6)."""
+    input:
+        f"{_NBD}.g4Discovery_clean.bed",
+    output:
+        plus=f"{_NBD}.g4Discovery_plus_clean.bed",
+        minus=f"{_NBD}.g4Discovery_minus_clean.bed",
+    log:
+        "logs/upstream/g4discovery_split_strands.log",
+    shell:
+        """
+        awk '$6=="+"' {input} > {output.plus}
+        awk '$6=="-"' {input} > {output.minus}
+        echo "plus: $(wc -l < {output.plus}), minus: $(wc -l < {output.minus})" > {log}
+        """
+
 
 rule gunzip:
     input:

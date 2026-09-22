@@ -27,7 +27,7 @@ def get_feature_source(sample: str) -> str:
     if val == "transcripts":
         val = "full_transcripts"
     return val
-GFA_MOTIFS = ["APR", "DR", "g4Discovery", "IR", "MR", "STR", "TRI", "Z"]
+GFA_MOTIFS = ["APR", "DR", "g4Discovery_plus", "g4Discovery_minus", "IR", "MR", "STR", "TRI", "Z"]
 
 # Include rule files
 include: "workflow/rules/common.smk"
