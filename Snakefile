@@ -256,7 +256,7 @@ rule basic_motif_analysis:
     log:
         "logs/{dataset}/basic_analysis_gfa.{motif}.log",
     conda:
-        "lnc-datasets"
+        "workflow/envs/nonb_analysis.yaml",
     threads: 1
     resources:
         mem_mb = 10000,

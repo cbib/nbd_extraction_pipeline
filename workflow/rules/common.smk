@@ -155,6 +155,24 @@ rule g4discovery_split_strands:
         "logs/upstream/g4discovery_split_strands.log",
     shell:
         """
+        mkdir -p $(dirname {log})
+        awk '$6=="+"' {input} > {output.plus}
+        awk '$6=="-"' {input} > {output.minus}
+        echo "plus: $(wc -l < {output.plus}), minus: $(wc -l < {output.minus})" > {log}
+        """
+
+rule split_toy_g4discovery_strands:
+    """Split the checked-in toy G4 BED into strand-specific fixtures."""
+    input:
+        "resources/toy/toy_g4Discovery_chr22_clean.bed",
+    output:
+        plus="resources/toy/toy_g4Discovery_plus_chr22_clean.bed",
+        minus="resources/toy/toy_g4Discovery_minus_chr22_clean.bed",
+    log:
+        "logs/toy/split_g4discovery_strands.log",
+    shell:
+        """
+        mkdir -p $(dirname {log})
         awk '$6=="+"' {input} > {output.plus}
         awk '$6=="-"' {input} > {output.minus}
         echo "plus: $(wc -l < {output.plus}), minus: $(wc -l < {output.minus})" > {log}

@@ -1,0 +1,11 @@
+# Reproducible toy annotation source.
+toy:
+  release: "Gencode human release 47"
+  assembly: "GRCh38"
+  chromosome: "chr22"
+  annotation_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_47/gencode.v47.basic.annotation.gtf.gz"
+  checksum_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_47/MD5SUMS"
+  annotation_md5: "823c2d44a2268d2c79a11986ffa29028"
+  archive: "resources/toy/source/gencode.v47.basic.annotation.gtf.gz"
+  extracted_gtf: "resources/toy/toy_chr22.gtf"
+  provenance: "resources/toy/toy_provenance.yaml"
