@@ -152,3 +152,51 @@ wildcards:
 # Known bugs — issues that must be resolved before the next pipeline run
 # ---------------------------------------------------------------------------
 known_bugs:
+
+# ---------------------------------------------------------------------------
+# Resource boundary — external prerequisites versus reproducible outputs
+# ---------------------------------------------------------------------------
+resource_boundary:
+  policy: >
+    Every external input must be present before DAG expansion. Missing upstream
+    tools and derived resources may be produced by pinned Snakemake rules, but
+    they must be listed separately in the preflight report.
+  external_inputs:
+    assembly_archive:
+      path: resources/GRCh38.p14.genome.fa.gz
+      source: config/config.yaml:upstream.assembly_gz
+    configured_dataset_annotations:
+      source: config/samples.yaml:samples[*].gtf
+    gencode_transcript_fastas:
+      - resources/gencode.v47.pc_transcripts.fa
+      - resources/gencode.v47.lncRNA_transcripts.fa
+    toy_transcript_ids:
+      - results/pc_transcript_ids.txt
+      - results/lncrna_transcript_ids.txt
+  reproducible_outputs:
+    - path: resources/GRCh38.p14.genome.fa
+      producer: decompress_assembly
+    - path: software/non-B_gfa/gfa
+      producer: install_gfa
+      repository: config/config.yaml:upstream.gfa_repository
+      revision: config/config.yaml:upstream.gfa_revision
+    - path: software/g4Discovery.PanSN/src/g4Discovery.py
+      producer: install_g4discovery
+      repository: config/config.yaml:upstream.g4discovery_repository
+      revision: config/config.yaml:upstream.g4discovery_revision
+    - path: resources/GRCh38_NonBDNA/*.bed
+      producer: all_upstream
+  toy_dataset:
+    manifest: config/toy.yaml
+    source: Gencode human release 47 basic annotation
+    assembly: GRCh38
+    chromosome: chr22
+    annotation_archive: resources/toy/source/gencode.v47.basic.annotation.gtf.gz
+    annotation_md5: 823c2d44a2268d2c79a11986ffa29028
+    generated_annotation: resources/toy/toy_chr22.gtf
+    provenance: resources/toy/toy_provenance.yaml
+    motif_fixture_policy: >
+      Existing toy motif BED fixtures remain checked-in inputs for now. Their
+      paths, SHA256 checksums, strand convention, and record counts are written
+      to toy_provenance.yaml; regeneration from a pinned sequence/tool source
+      is a subsequent reproducibility decision.
