@@ -9,7 +9,24 @@ and lncRNA transcripts.
 
 - Conda / Mamba (environments: `workflow/envs/gfa.yaml`, `g4discovery.yaml`)
 - Snakemake ≥ 7
-- Pre-computed Non-B DNA BED files in `resources/GRCh38_NonBDNA/`
+- Internet access for the pinned upstream tool clones when regenerating motifs
+
+## Non-B Motif Generation
+
+`all_upstream` regenerates the GRCh38 motif BED files used by non-toy datasets.
+It runs the default `non-B_gfa` predictor for APR, DR, IR, MR, STR, and Z-DNA;
+G4 prediction is skipped there because it is produced separately by the default
+`g4Discovery` workflow. TRI is the subset of MR records whose gfa `Subset`
+field is flagged as triplex-prone. G4Discovery is run once per configured GRCh38
+contig because it accepts a single FASTA record per invocation; the merged BED
+retains the pqsfinder and G4Hunter score columns and is then split by strand.
+
+The tool URLs, pinned revisions, FASTA paths, and contigs are declared under
+`upstream` in `config/config.yaml`. Generate the resource set with:
+
+```bash
+snakemake --use-conda --cores 1 all_upstream
+```
 
 ## Quick start
 
