@@ -32,7 +32,7 @@ GFA_MOTIFS = ["APR", "DR", "g4Discovery_plus", "g4Discovery_minus", "IR", "MR", 
 # Include rule files
 include: "workflow/rules/common.smk"
 include: "workflow/rules/extended_analysis.smk"
-#include: "workflow/rules/upstream.smk"
+include: "workflow/rules/upstream.smk"
 
 
 # ============================================================================

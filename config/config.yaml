@@ -81,5 +81,37 @@ paths:
 upstream:
   assembly_gz: "resources/GRCh38.p14.genome.fa.gz"
   assembly_fa: "resources/GRCh38.p14.genome.fa"
-  gfa_prefix: "GCA_000001405.15_GRCh38_no_alt_analysis_set"
+  nbd_dir: "resources/GRCh38_NonBDNA"
+  assembly_prefix: "GCA_000001405.15_GRCh38_no_alt_analysis_set"
   tools_dir: "software"
+  gfa_repository: "https://github.com/abcsFrederick/non-B_gfa.git"
+  gfa_revision: "a891b59a4f262c83f990739d5802863e6c621175"
+  g4discovery_repository: "https://github.com/saswat-km/g4Discovery.PanSN.git"
+  g4discovery_revision: "5620c226297ee98d21e2e20ca3368e928ee94fd4"
+  # g4Discovery accepts a single FASTA record, so these are run independently.
+  g4_contigs:
+    - chr1
+    - chr2
+    - chr3
+    - chr4
+    - chr5
+    - chr6
+    - chr7
+    - chr8
+    - chr9
+    - chr10
+    - chr11
+    - chr12
+    - chr13
+    - chr14
+    - chr15
+    - chr16
+    - chr17
+    - chr18
+    - chr19
+    - chr20
+    - chr21
+    - chr22
+    - chrX
+    - chrY
+    - chrM

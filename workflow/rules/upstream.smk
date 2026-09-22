@@ -25,34 +25,36 @@ _GFA_BASE_MOTIFS = ["APR", "DR", "IR", "MR", "STR", "Z"]
 # All GFA-derived downstream types (TRI extracted separately from MR TSV)
 _GFA_ALL_MOTIFS = _GFA_BASE_MOTIFS + ["TRI"]
 
-# Assembly prefix (matches the naming of pre-computed BED files)
-_ASSEMBLY_PREFIX = "GCA_000001405.15_GRCh38_no_alt_analysis_set"
-_NBD_DIR = f"resources/GRCh38_NonBDNA"
+_ASSEMBLY_PREFIX = config["upstream"]["assembly_prefix"]
+_NBD_DIR = config["upstream"]["nbd_dir"]
+_TOOLS_DIR = config["upstream"]["tools_dir"]
+_G4_CONTIGS = config["upstream"]["g4_contigs"]
 
 
 # ── Upstream convenience target ──────────────────────────────────────────────
 
+
 rule all_upstream:
-    """Produce all cleaned Non-B DNA BED files (GFA × 7 + g4Discovery × 1)."""
+    """Produce all cleaned Non-B DNA BED files (GFA × 7 + g4Discovery × 3)."""
     input:
         expand(
             f"{_NBD_DIR}/{_ASSEMBLY_PREFIX}.gfa.{{motif}}_clean.bed",
             motif=_GFA_ALL_MOTIFS,
         ),
         f"{_NBD_DIR}/{_ASSEMBLY_PREFIX}.g4Discovery_clean.bed",
+        f"{_NBD_DIR}/{_ASSEMBLY_PREFIX}.g4Discovery_plus_clean.bed",
+        f"{_NBD_DIR}/{_ASSEMBLY_PREFIX}.g4Discovery_minus_clean.bed",
 
 
 # ── Genome assembly ───────────────────────────────────────────────────────────
 
+
 rule decompress_assembly:
     """Decompress the GRCh38.p14 genome FASTA for tool input."""
     input:
-        gz=lambda wc: config.get(
-            "assembly_gz",
-            "resources/GRCh38.p14.genome.fa.gz",
-        ),
+        gz=config["upstream"]["assembly_gz"],
     output:
-        fa="resources/GRCh38.p14.genome.fa",
+        fa=config["upstream"]["assembly_fa"],
     log:
         "logs/upstream/decompress_assembly.log",
     conda:
@@ -63,6 +65,7 @@ rule decompress_assembly:
 
 # ── GFA installation ──────────────────────────────────────────────────────────
 
+
 rule install_gfa:
     """Clone and compile the non-B_gfa C tool.
 
@@ -71,19 +74,20 @@ rule install_gfa:
     already exists (Snakemake cache).
     """
     output:
-        binary="software/non-B_gfa/gfa",
+        binary=f"{_TOOLS_DIR}/non-B_gfa/gfa",
     log:
         "logs/upstream/install_gfa.log",
     conda:
         "../envs/gfa.yaml"
     shell:
         """
-        mkdir -p software
-        if [ ! -d software/non-B_gfa/.git ]; then
-            git clone https://github.com/abcsFrederick/non-B_gfa.git software/non-B_gfa \
+        mkdir -p {_TOOLS_DIR}
+        if [ ! -d {_TOOLS_DIR}/non-B_gfa/.git ]; then
+            git clone {config[upstream][gfa_repository]} {_TOOLS_DIR}/non-B_gfa \
                 2> {log}
         fi
-        cd software/non-B_gfa
+        cd {_TOOLS_DIR}/non-B_gfa
+        git checkout --detach {config[upstream][gfa_revision]} >> ../../{log} 2>&1
         make 2>> ../../{log}
         echo "gfa binary built at $(pwd)/gfa" >> ../../{log}
         """
@@ -91,29 +95,34 @@ rule install_gfa:
 
 # ── g4Discovery installation ──────────────────────────────────────────────────
 
+
 rule install_g4discovery:
     """Clone the g4Discovery.PanSN Python/R tool.
 
     No compilation needed; produces the main Python script.
     """
     output:
-        script="software/g4Discovery.PanSN/g4Discovery.py",
+        script=f"{_TOOLS_DIR}/g4Discovery.PanSN/src/g4Discovery.py",
     log:
         "logs/upstream/install_g4discovery.log",
     conda:
         "../envs/g4discovery.yaml"
     shell:
         """
-        mkdir -p software
-        if [ ! -d software/g4Discovery.PanSN/.git ]; then
-            git clone https://github.com/saswat-km/g4Discovery.PanSN.git \
-                software/g4Discovery.PanSN 2> {log}
+        mkdir -p {_TOOLS_DIR}
+        if [ ! -d {_TOOLS_DIR}/g4Discovery.PanSN/.git ]; then
+            git clone {config[upstream][g4discovery_repository]} \
+                {_TOOLS_DIR}/g4Discovery.PanSN 2> {log}
         fi
-        echo "g4Discovery cloned at software/g4Discovery.PanSN" >> {log}
+        cd {_TOOLS_DIR}/g4Discovery.PanSN
+        git checkout --detach {config[upstream][g4discovery_revision]} >> ../../{log} 2>&1
+        test -f src/g4Discovery.py
+        echo "g4Discovery cloned at $(pwd)" >> ../../{log}
         """
 
 
 # ── GFA motif annotation ──────────────────────────────────────────────────────
+
 
 rule run_gfa:
     """Run gfa on the whole GRCh38 assembly to annotate non-B DNA motifs.
@@ -125,8 +134,8 @@ rule run_gfa:
     (TRI is extracted from MR in the gfa_extract_triplex rule.)
     """
     input:
-        fa="resources/GRCh38.p14.genome.fa",
-        gfa_bin="software/non-B_gfa/gfa",
+        fa=config["upstream"]["assembly_fa"],
+        gfa_bin=f"{_TOOLS_DIR}/non-B_gfa/gfa",
     output:
         # gfa writes <prefix>_APR.tsv, <prefix>_DR.tsv, etc.
         tsv=expand(
@@ -207,33 +216,67 @@ rule gfa_extract_triplex:
 
 # ── g4Discovery G-quadruplex annotation ──────────────────────────────────────
 
-rule run_g4discovery:
-    """Run g4Discovery on the GRCh38 assembly with default settings.
 
-    Outputs a gzipped BED file containing G4 positions on both strands,
-    with both pqsfinder and G4Hunter scores.
-    Default thresholds: pqsfinder >= 40, |G4Hunter| >= 1.5, tetrads >= 3.
-    """
+rule split_assembly_for_g4discovery:
+    """Extract configured GRCh38 contigs as one-record FASTA files."""
     input:
-        fa="resources/GRCh38.p14.genome.fa",
-        script="software/g4Discovery.PanSN/g4Discovery.py",
+        fa=config["upstream"]["assembly_fa"],
     output:
-        gz=f"results/g4discovery_raw/{_ASSEMBLY_PREFIX}.g4Discovery.bed.gz",
+        expand("results/g4discovery_raw/fasta/{contig}.fa", contig=_G4_CONTIGS),
+    params:
+        contigs=" ".join(_G4_CONTIGS),
     log:
-        "logs/upstream/run_g4discovery.log",
+        "logs/upstream/split_assembly_for_g4discovery.log",
+    conda:
+        "base"
+    shell:
+        r"""
+        mkdir -p results/g4discovery_raw/fasta
+        awk -v outdir="results/g4discovery_raw/fasta" -v contigs="{params.contigs}" '
+            BEGIN {{ count = split(contigs, items, " "); for (i = 1; i <= count; i++) wanted[items[i]] = 1 }}
+            /^>/ {{ contig = substr($1, 2); write_record = (contig in wanted) }}
+            write_record {{ print > (outdir "/" contig ".fa") }}
+        ' {input.fa} > {log}
+        for contig in {params.contigs}; do test -s "results/g4discovery_raw/fasta/$contig.fa"; done
+        """
+
+
+rule run_g4discovery_contig:
+    """Run default G4Discovery on one GRCh38 contig, retaining both scores."""
+    input:
+        fa="results/g4discovery_raw/fasta/{contig}.fa",
+        script=f"{_TOOLS_DIR}/g4Discovery.PanSN/src/g4Discovery.py",
+    output:
+        gz="results/g4discovery_raw/contigs/{contig}.g4Discovery.bed.gz",
+    log:
+        "logs/upstream/run_g4discovery_{contig}.log",
     conda:
         "../envs/g4discovery.yaml"
     threads: 1
     resources:
         mem_mb=32768,
-        runtime=2880,  # 48 h — whole-genome G4 prediction is very slow
+        runtime=2880,
     shell:
         """
-        mkdir -p results/g4discovery_raw
-        python3 {input.script} \
-            -fa {input.fa} \
-            -o {output.gz} \
-            > {log} 2>&1
+        mkdir -p results/g4discovery_raw/contigs
+        python3 {input.script} -fa {input.fa} -chr {wildcards.contig} -o {output.gz} > {log} 2>&1
+        """
+
+
+rule merge_g4discovery:
+    """Merge per-contig default G4Discovery BEDs without dropping score columns."""
+    input:
+        expand("results/g4discovery_raw/contigs/{contig}.g4Discovery.bed.gz", contig=_G4_CONTIGS),
+    output:
+        gz=f"results/g4discovery_raw/{_ASSEMBLY_PREFIX}.g4Discovery.bed.gz",
+    log:
+        "logs/upstream/merge_g4discovery.log",
+    conda:
+        "base"
+    shell:
+        """
+        zcat {input} | sort -k1,1 -k2,2n | gzip -c > {output.gz}
+        echo "$(zcat {output.gz} | wc -l) G4 records merged" > {log}
         """
 
 
@@ -262,3 +305,6 @@ rule g4discovery_clean_chrom:
             > {output.clean} 2>> {log}
         echo "$(wc -l < {output.clean}) G4 records in clean BED" >> {log}
         """
+
+
+# ponytail: g4discovery_split_strands lives in common.smk so it's available without upstream tools
