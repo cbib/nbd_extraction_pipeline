@@ -215,6 +215,39 @@ rule prepare_transcript_ids:
 # EXECUTION ORDER 2: Basic Analysis (Per-Motif)
 # ============================================================================
 
+rule basic_gtf_intersect:
+    """
+    Intersect annotation GTF with NBD motif BED for the basic analysis path.
+    Produces the 18-column (9 GTF + 9 BED) file that parse_overlaps.py expects.
+    """
+    input:
+        left = lambda wildcards: (
+            f"resources/{wildcards.dataset}/{wildcards.dataset}_chr22.gtf"
+            if wildcards.dataset == "toy"
+            else config["samples"].get(wildcards.dataset, {}).get(
+                "gtf", f"resources/{wildcards.dataset}.annotation.gtf"
+            )
+        ),
+        right = lambda wildcards: (
+            f"resources/toy/toy_{wildcards.motif_file}_chr22_clean.bed"
+            if wildcards.dataset == "toy"
+            else f"{_NBD}.{wildcards.motif_file}_clean.bed"
+        ),
+    output:
+        overlap = "results/{dataset}/isect_{motif_file}.bed",
+    params:
+        extra = "-wa -wb",
+    log:
+        "logs/{dataset}/basic_isect_{motif_file}.log",
+    resources:
+        mem_mb = 10000,
+        runtime = 60,
+    wildcard_constraints:
+        motif_file = r"g4Discovery(_plus|_minus)?|gfa\.(APR|DR|IR|MR|STR|TRI|Z)",
+    wrapper:
+        "v7.3.0/bio/bedtools/intersect"
+
+
 rule basic_motif_analysis:
     """
     Basic per-motif analysis using parse_overlaps.py.
