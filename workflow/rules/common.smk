@@ -2,6 +2,82 @@
 # Helper Functions
 # ============================================================================
 
+from pathlib import Path
+from snakemake.exceptions import WorkflowError
+
+
+def get_feature_source(sample: str) -> str:
+    """Return the configured feature source for a dataset."""
+    value = config.get("samples", {}).get(sample, {}).get("feature_source", "exons")
+    return "full_transcripts" if value == "transcripts" else value
+
+
+def _resource_preflight(datasets) -> None:
+    """Fail before DAG expansion when configured external inputs are absent."""
+    missing = []
+    buildable = []
+    samples = config.get("samples", {})
+
+    def require_file(path: str, purpose: str) -> None:
+        if not Path(path).is_file():
+            missing.append(f"  - {path} ({purpose})")
+
+    for dataset in datasets:
+        sample = samples.get(dataset)
+        if sample is None:
+            missing.append(f"  - config/samples.yaml entry for dataset '{dataset}'")
+            continue
+
+        gtf = sample.get("gtf")
+        if not gtf:
+            missing.append(f"  - samples.{dataset}.gtf in config/samples.yaml")
+        elif dataset == "toy" and not Path(gtf).is_file():
+            buildable.append(f"  - {gtf} (built by rule create_toy_annotation)")
+        else:
+            require_file(gtf, f"annotation GTF for {dataset}")
+
+        if dataset == "toy":
+            # Toy transcript biotypes are derived directly from the checked-in GTF.
+            pass
+        else:
+            require_file(
+                "resources/gencode.v47.pc_transcripts.fa",
+                f"protein-coding transcript FASTA for {dataset}",
+            )
+            require_file(
+                "resources/gencode.v47.lncRNA_transcripts.fa",
+                f"lncRNA transcript FASTA for {dataset}",
+            )
+
+    if any(dataset != "toy" for dataset in datasets):
+        upstream = config.get("upstream", {})
+        require_file(upstream.get("assembly_gz", ""), "configured assembly archive")
+        for key in ("gfa_repository", "gfa_revision", "g4discovery_repository", "g4discovery_revision"):
+            if not upstream.get(key):
+                missing.append(f"  - config/config.yaml upstream.{key}")
+
+        gfa_binary = Path(upstream.get("tools_dir", "software")) / "non-B_gfa/gfa"
+        g4_script = Path(upstream.get("tools_dir", "software")) / "g4Discovery.PanSN/src/g4Discovery.py"
+        if not gfa_binary.is_file():
+            buildable.append(f"  - {gfa_binary} (built by rule install_gfa)")
+        if not g4_script.is_file():
+            buildable.append(f"  - {g4_script} (fetched by rule install_g4discovery)")
+
+    if missing:
+        message = [
+            "Resource preflight failed before DAG expansion.",
+            "Missing configured external prerequisites:",
+            *missing,
+        ]
+        if buildable:
+            message.extend(["", "Missing upstream outputs that Snakemake can build:", *buildable])
+        message.extend([
+            "",
+            "Provide the listed resources or update the declared resource manifest;",
+            "do not silently change the configured dataset.",
+        ])
+        raise WorkflowError("\n".join(message))
+
 def get_motif_filename(motif):
     """
     Map motif names to their corresponding filename patterns.

@@ -6,9 +6,6 @@
 # - Basic per-motif analysis with visualizations (parse_overlaps.py)
 # - Extended comprehensive analysis with statistical tests (new)
 
-import os
-from pathlib import Path
-
 # Configuration
 configfile: "config/config.yaml"
 configfile: "config/samples.yaml"
@@ -16,23 +13,15 @@ configfile: "config/samples.yaml"
 # Global variables
 DATASETS = config.get("datasets", ["toy", "gencode.v47"])
 
-
-def get_feature_source(sample: str) -> str:
-    """Return 'exons' or 'full_transcripts' for a given sample (default: 'exons').
-
-    Both 'full_transcripts' and 'transcripts' are accepted in samples.yaml.
-    """
-    val = config.get("samples", {}).get(sample, {}).get("feature_source", "exons")
-    # Accept short alias 'transcripts' as well as the canonical 'full_transcripts'
-    if val == "transcripts":
-        val = "full_transcripts"
-    return val
 GFA_MOTIFS = ["APR", "DR", "g4Discovery_plus", "g4Discovery_minus", "IR", "MR", "STR", "TRI", "Z"]
 
 # Include rule files
 include: "workflow/rules/common.smk"
 include: "workflow/rules/extended_analysis.smk"
 include: "workflow/rules/upstream.smk"
+
+# Check that all required resources are present before running the pipeline
+_resource_preflight(DATASETS)
 
 
 # ============================================================================
