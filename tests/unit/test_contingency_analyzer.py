@@ -38,7 +38,9 @@ def test_perform_motif_type_tests_synthetic(tmp_path, synthetic_features_df):
     analyzer.load_features()
     results = analyzer.perform_motif_type_tests()
     # Only motifs whose presence column exists in the fixture
-    assert set(["APR", "DR"]).issubset(set(results["motif_type"].str.upper()))
+    assert {"APR", "DR", "GQ_PLUS", "GQ_MINUS"} <= set(
+        results["motif_type"].str.upper()
+    )
     assert "p_value" in results.columns
     assert "cramers_v" in results.columns
     assert (results["p_value"] >= 0).all()
