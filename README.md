@@ -1,122 +1,142 @@
-# Non-B DNA Analysis Pipeline
+# Non-B DNA analysis pipeline
 
-Snakemake workflow that intersects human transcript annotations (GTF) with
-Non-B DNA structural-motif BED files and produces per-transcript feature
-summaries, enrichment tests, and statistical analyses comparing protein-coding
-and lncRNA transcripts.
+This Snakemake workflow intersects human transcript annotations with nine
+Non-B DNA motif sets and compares protein-coding and lncRNA transcripts. The
+default `all` target produces per-motif summaries and plots, an extended feature
+matrix, contingency tests, statistical tests, and an analysis completion marker.
+
+The configured publication dataset, `gencode.v47.transcripts`, measures motifs
+across **genomic transcript spans, including introns**. Its `transcript_length`
+is the span length, not the length of a spliced RNA molecule. Interpret results
+and manuscript claims accordingly.
+
+## Inputs
+
+Run commands below from the `nonb-pipeline/` directory. The default dataset
+requires these external files, which are absent from a fresh checkout:
+
+| Path | Format and role |
+|---|---|
+| `resources/gencode.v47.annotation.gtf` | GENCODE v47 GRCh38 GTF; transcript and exon records provide the annotation intervals. |
+| `resources/gencode.v47.pc_transcripts.fa` | Protein-coding transcript FASTA; versioned transcript IDs in headers provide coding labels. |
+| `resources/gencode.v47.lncRNA_transcripts.fa` | lncRNA transcript FASTA; versioned transcript IDs in headers provide lncRNA labels. |
+| `resources/GRCh38.p14.genome.fa.gz` | GRCh38 assembly FASTA archive used to generate motif BED files. |
+
+The GTF and both transcript FASTAs must describe the same GENCODE release.
+The assembly must match their GRCh38 coordinates. Obtain these reference files
+from GENCODE and the GRCh38 assembly provider; the pipeline checks for them
+before constructing a production DAG. The workflow builds the motif resources
+under `resources/GRCh38_NonBDNA/` using pinned `non-B_gfa` and `g4Discovery`
+revisions. The nine clean BED inputs are named
+`GCA_000001405.15_GRCh38_no_alt_analysis_set.{motif}_clean.bed`, where
+`{motif}` can be:
+
+- `gfa.APR`
+- `gfa.DR`
+- `gfa.IR`
+- `gfa.MR`
+- `gfa.STR`
+- `gfa.TRI`
+- `gfa.Z`
+- `g4Discovery_plus`
+- `g4Discovery_minus`
+
+For the `toy` dataset, Snakemake downloads a checksum-verified GENCODE v47
+basic GTF and hg38 chromosome 22 FASTA. It extracts
+`resources/toy/toy_chr22.gtf`, runs the pinned `non-B_gfa` and `g4Discovery`
+tools on chromosome 22, and creates all nine
+`resources/toy/toy_{motif}_chr22_clean.bed` files. A fresh checkout needs
+network access, but no toy BED fixtures. The exact filenames are listed in
+`workflow/rules/toy.smk`. Toy transcript labels come from the GTF's
+`transcript_type` attribute. Production labels come from the two transcript
+FASTAs listed above.
 
 ## Requirements
 
-- Conda / Mamba (environments: `workflow/envs/gfa.yaml`,
-    `workflow/envs/g4discovery.yaml`, and `workflow/envs/nonb_analysis.yaml`)
-- Snakemake ≥ 7
-- Internet access when a pinned upstream tool, full reference resource, or toy
-    annotation archive has not already been acquired
+- Snakemake 9 with Conda or Mamba.
+- Network access on first use to fetch the pinned Snakemake bedtools wrapper,
+  create rule environments, download the toy GTF and chr22 FASTA, or clone
+  upstream motif tools.
+- For motif regeneration: the rule environments provide the C compiler, R and
+  Python packages; the workflow also uses standard shell tools. No GPU is
+  required.
+- The default profile uses SLURM. Use `--executor local` for a local run.
 
-## Resource Policy
+## Run
 
-The workflow checks configured external prerequisites before expanding the DAG.
-Non-toy runs require the configured Gencode annotation and transcript FASTAs,
-plus the compressed GRCh38 assembly. Missing upstream tools and derived motif
-BED resources are built by pinned workflow rules; missing external resources
-produce an actionable preflight error rather than silently changing datasets.
-
-Resource provenance and the declared external/buildable boundary are recorded
-in `nbd_pipeline_manifest.yaml`.
-
-## Non-B Motif Generation
-
-`all_upstream` regenerates the GRCh38 motif BED files used by non-toy datasets.
-It runs the default `non-B_gfa` predictor for APR, DR, IR, MR, STR, and Z-DNA;
-G4 prediction is skipped there because it is produced separately by the default
-`g4Discovery` workflow. TRI is the subset of MR records whose gfa `Subset`
-field is flagged as triplex-prone. G4Discovery is run once per configured GRCh38
-contig because it accepts a single FASTA record per invocation; the merged BED
-retains the pqsfinder and G4Hunter score columns and is then split by strand.
-
-The tool URLs, pinned revisions, FASTA paths, and contigs are declared under
-`upstream` in `config/config.yaml`. Generate the resource set with:
+From `nonb-pipeline/`, after providing the production inputs:
 
 ```bash
-snakemake --use-conda --cores 1 all_upstream
+# Local production run
+snakemake --executor local --cores 8 --use-conda all
+
+# SLURM production run (uses profiles/default/config.yaml)
+snakemake --profile profiles/default all
 ```
 
-The active motif set contains nine entries: `APR`, `DR`, `g4Discovery_plus`,
-`g4Discovery_minus`, `IR`, `MR`, `STR`, `TRI`, and `Z`. The G4 outputs are
-separate plus- and minus-strand BED files.
-
-## Quick start
+For the smaller chromosome 22 check, Snakemake builds the toy inputs:
 
 ```bash
-# copy and edit the default config; it enables gencode.v47.transcripts
-cp config/config.yaml config/config_mine.yaml
-
-snakemake --snakefile Snakefile \
-          --configfile config/config_mine.yaml \
-          --use-conda --cores 8
-
-# Extended analysis for every configured dataset
-snakemake --snakefile Snakefile \
-          --configfile config/config_mine.yaml \
-          --use-conda --cores 8 extended_analysis_all_datasets
+snakemake --executor local --cores 1 --use-conda --config datasets='[toy]' all
 ```
 
-## Toy Dataset
+To build only the genome-wide motif BED resources, run `all_upstream` with the
+same local or SLURM options. To make the optional combined text report, target
+`results/gencode.v47.transcripts/complete_analysis_report.txt`.
 
-Run the toy workflow explicitly; the default configuration does not enable it:
+## Configuration
 
-```bash
-snakemake --snakefile Snakefile --configfile config/config.yaml \
-          --use-conda --cores 1 --config datasets='[toy]'
-```
+`Snakefile` loads `config/config.yaml`, `config/samples.yaml`, and
+`config/toy.yaml`, in that order. Command-line `--config` and `--configfile`
+values can override loaded values. Copy a config before editing it if you want
+to keep the default publication setup intact.
 
-On its first run, the workflow downloads the pinned Gencode v47 basic
-annotation, verifies its MD5, extracts `chr22`, and writes
-`resources/toy/toy_provenance.yaml`. The provenance file records checksums and
-record counts for the extracted annotation and the checked-in motif BED
-fixtures. Source URL, checksum, assembly, chromosome, and output paths are
-declared in `config/toy.yaml`.
+### Functioning parameters
 
-## Analysis layers
+| Parameter | Default | Meaning |
+|---|---|---|
+| `datasets` | `[gencode.v47.transcripts]` | Dataset names to build under `results/{dataset}/`; each name needs a `samples` entry. |
+| `samples.gencode.v47.transcripts.gtf` | `resources/gencode.v47.annotation.gtf` | Production GTF input. |
+| `samples.gencode.v47.transcripts.feature_source` | `transcripts` | Uses full genomic transcript BED intervals, including introns. `exons` instead uses exon intervals and summed exon length, but requires a matching dataset/configuration and regenerated results. |
+| `upstream.assembly_gz` | `resources/GRCh38.p14.genome.fa.gz` | External assembly archive for motif generation. |
+| `upstream.g4_contigs` | `chr1`–`chr22`, `chrX`, `chrY`, `chrM` | Contigs processed separately by g4Discovery. |
+| `gfa_motifs` | Nine motifs | Declared in config but not used; the active motif list is fixed in the Snakefile. |
+| `analysis.*` | `run_basic: true`, `run_extended: true`, `keep_other_transcripts: false`, `alpha: 0.05`, `correction_method: fdr` | Declared but not read by the active workflow; changing them does not change analysis behavior. |
 
-| Layer | Entry rule | Description |
-|-------|-----------|-------------|
-| **Basic** | `all` | Per-motif overlap summaries + KDE distribution plots |
-| **Extended** | `extended_analysis_all_datasets` | 100+ feature extraction, chi-square contingency tests, univariate statistical tests, and Random Forest feature importance |
+For a one-off toy run, use `--config datasets='[toy]'` as shown above. The
+`upstream` section also pins tool repositories and Git revisions; see
+`config/config.yaml` before changing resource generation.
 
-## Pipeline steps
+### Environment
 
-| Step | Rule | Output |
-|------|------|--------|
-| 1 | `create_transcripts_bed` | `transcripts.bed` (BED6 from GTF) |
-| 1 | `create_biotypes_from_fasta` | `biotypes.tsv` |
-| 1 | `prepare_transcript_ids` | `annotation/pc_transcript_ids.txt`, `lncrna_transcript_ids.txt` |
-| 2 | `basic_motif_analysis` | `transcript_gfa.{motif}_summary.tsv`, `gfa.{motif}_distributions.png` (×9 motifs) |
-| 3.1 | `extended_feature_extraction` | `extended_analysis/features_nonb_features.csv`, `features_nonb_summary.txt` |
-| 3.2 | `extended_contingency_analysis` | `extended_analysis/contingency_motif_type_chi_square.csv`, `contingency_contingency_report.txt` |
-| 3.3 | `extended_statistical_analysis` | `extended_analysis/statistics_univariate_tests.csv`, `statistics_feature_importance.csv` |
-| 4 | `create_summary_report` | `complete_analysis_report.txt` |
+| Parameter | Default | Meaning |
+|---|---|---|
+| `profiles/default/config.yaml:executor` | `slurm` | Default executor; override with `--executor local` for local work. |
+| `profiles/default/config.yaml:jobs` | `100` | Maximum concurrent SLURM jobs. |
+| `profiles/default/config.yaml:use-conda` | `true` | Activate rule-specific Conda environments. |
+| `profiles/default/config.yaml:latency-wait` | `40` seconds | Wait for outputs on shared storage. |
+| `--cores` | `8` local / scheduler allocation on SLURM | Local CPU limit; choose a value supported by the machine. |
 
-All outputs are namespaced under `results/{dataset}/`.
+## Outputs
 
-## Configs
+Outputs are under `results/{dataset}/`. The feature matrix for the configured
+publication dataset is the principal result for downstream analysis:
 
-| File | Purpose |
-|------|---------|
-| `config/config.yaml` | Default configuration (`gencode.v47.transcripts`) |
-| `config/samples.yaml` | Dataset annotation, motif BED, and feature-source settings |
-| `config/toy.yaml` | Pinned toy annotation source and reproducible-output paths |
+| File | Meaning |
+|---|---|
+| `extended_analysis/features_nonb_features.csv` | One row per annotated transcript, with motif features, span length and coding class. Transcripts without motif hits retain zero-valued motif features; IDs absent from both production FASTAs can have class `other`. |
+| `extended_analysis/contingency_motif_type_chi_square.csv` | Coding versus lncRNA motif-presence tests. |
+| `extended_analysis/statistics_univariate_tests.csv` | Per-feature coding versus lncRNA tests and adjusted p values. |
+| `extended_analysis/statistics_feature_importance.csv` | Random Forest feature importance. |
+| `transcript_gfa.{motif}_summary.tsv`, `gfa.{motif}_distributions.png` | Basic per-motif transcript summaries and KDE plots. |
+| `extended_analysis/analysis_complete.txt` | Completion marker, not an analysis table. |
+| `complete_analysis_report.txt` | Optional combined text report; not part of `all`. |
 
-## Toy Dataset Labels
+## Reproducibility and limits
 
-The reproducible toy dataset extracts `chr22` from the pinned Gencode v47 GTF
-and derives its coding/lncRNA labels from the GTF `transcript_type` attribute.
-This is a temporary workaround for a deterministic toy workflow; it is not
-equivalent to the transcript classification required to reproduce the article's
-findings. Production datasets must import coding/lncRNA labels derived from the
-presence of transcripts in the GENCODE fasta files.
-
-## Dev info
-
-See `nbd_pipeline_manifest.yaml` for the full rule catalogue, known bugs, and
-script inventory.
+The motif tool Git revisions, toy annotation and FASTA URLs and MD5s, and rule
+Conda environments are declared in config and `workflow/envs/`. The bedtools
+wrapper is pinned at `v7.3.0`. Toy analysis passed twice with the earlier local
+BED files on 2026-09-29; the new toy BED generation rules have passed a forced
+resource DAG dry run but still need a clean-checkout integration run. For
+resource boundaries and the rule inventory, see `nbd_pipeline_manifest.yaml`.
