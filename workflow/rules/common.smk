@@ -49,9 +49,10 @@ def _resource_preflight(datasets) -> None:
                 f"lncRNA transcript FASTA for {dataset}",
             )
 
-    if any(dataset != "toy" for dataset in datasets):
+    if datasets:
         upstream = config.get("upstream", {})
-        require_file(upstream.get("assembly_gz", ""), "configured assembly archive")
+        if any(dataset != "toy" for dataset in datasets):
+            require_file(upstream.get("assembly_gz", ""), "configured assembly archive")
         for key in ("gfa_repository", "gfa_revision", "g4discovery_repository", "g4discovery_revision"):
             if not upstream.get(key):
                 missing.append(f"  - config/config.yaml upstream.{key}")
@@ -162,7 +163,7 @@ rule g4discovery_split_strands:
         """
 
 rule split_toy_g4discovery_strands:
-    """Split the checked-in toy G4 BED into strand-specific fixtures."""
+    """Split the generated toy G4 BED into strand-specific files."""
     input:
         "resources/toy/toy_g4Discovery_chr22_clean.bed",
     output:

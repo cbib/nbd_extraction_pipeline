@@ -21,9 +21,9 @@ TOY_RESOURCE_PROVENANCE = (
 
 # Include rule files
 include: "workflow/rules/common.smk"
+include: "workflow/rules/upstream.smk"
 include: "workflow/rules/toy.smk"
 include: "workflow/rules/extended_analysis.smk"
-include: "workflow/rules/upstream.smk"
 
 # Check that all required resources are present before running the pipeline
 _resource_preflight(DATASETS)

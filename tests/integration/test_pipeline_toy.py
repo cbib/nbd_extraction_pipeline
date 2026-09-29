@@ -2,7 +2,7 @@
 
 Requires:
   - snakemake + conda available in PATH
-  - resources/toy/ data present
+  - network access on first run to download reference inputs and pinned tools
   - run with: pytest tests/integration/ -m integration
 """
 
