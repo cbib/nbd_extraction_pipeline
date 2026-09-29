@@ -35,48 +35,6 @@ analysis:
   # Multiple testing correction method
   correction_method: "fdr"  # Options: "fdr", "bonferroni"
 
-# Resource allocation
-resources:
-  # Feature extraction
-  feature_extraction:
-    threads: 1
-    mem_mb: 10000
-    runtime_minutes: 30
-
-  # Statistical analysis
-  statistical_analysis:
-    threads: 4  # Use multiple cores for Random Forest
-    mem_mb: 10000
-    runtime_minutes: 10
-
-  # Basic analysis (per motif)
-  basic_analysis:
-    threads: 1
-    mem_mb: 10000
-    runtime_minutes: 10
-
-# Output options
-output:
-  # Save resolved elements BED files
-  save_resolved_elements: true
-
-  # Generate visualizations
-  create_plots: true
-
-  # Create summary report
-  create_summary: true
-
-# Paths (optional - defaults shown)
-paths:
-  # Input data directory
-  # data_dir: "data"
-
-  # Results directory
-  # results_dir: "results"
-
-  # Logs directory
-  # logs_dir: "logs"
-
 # Upstream tool configuration
 upstream:
   assembly_gz: "resources/GRCh38.p14.genome.fa.gz"
