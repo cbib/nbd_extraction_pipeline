@@ -22,6 +22,7 @@ software/
 # Other result files
 *.tsv
 *.csv
+!tests/snapshots/integration/*.csv
 *.png
 *.pdf
 *.html
