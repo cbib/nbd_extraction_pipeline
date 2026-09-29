@@ -45,7 +45,9 @@ class NonBContingencyAnalyzer:
         self.motif_types = [
             "apr",
             "dr",
-            "gq",
+            "gq_plus",
+            "gq_minus",
+            "gq",  # legacy feature tables
             "ir",
             "mr",
             "str",

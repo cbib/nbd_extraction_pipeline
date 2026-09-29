@@ -6,11 +6,6 @@ samples:
     # "exons" (default) | "full_transcripts" / "transcripts" (alias)
     feature_source: "exons"
 
-  gencode.v47.exons:
-    gtf: resources/gencode.v47.annotation.gtf
-    bed: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.{nbd_type}_clean.bed"
-    feature_source: "exons"
-
   gencode.v47.transcripts:
     gtf: resources/gencode.v47.annotation.gtf
     bed: "resources/GRCh38_NonBDNA/GCA_000001405.15_GRCh38_no_alt_analysis_set.{nbd_type}_clean.bed"

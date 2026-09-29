@@ -356,6 +356,19 @@ def create_visualization(hits: pd.DataFrame, nbd_type: str, output_dir: str) -> 
     """
     logger.info(f"Creating KDE visualization plots for {nbd_type.upper()}")
 
+    if hits.empty:
+        logger.warning(
+            f"No data to plot for {nbd_type.upper()}, skipping visualization"
+        )
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        fig.suptitle(f"{nbd_type.upper()} — No data", fontsize=14)
+        plt.tight_layout()
+        plt.savefig(
+            f"{output_dir}/{nbd_type}_distributions.png", dpi=150, bbox_inches="tight"
+        )
+        plt.close()
+        return
+
     # Dynamic column names (now normalized per kb)
     hit_count_col = f"{nbd_type}_hit_count_per_kb"
     max_length_col = f"max_{nbd_type}_length_as_%"
@@ -524,7 +537,7 @@ def main(
     df = extract_attributes(df)
 
     # Classify and calculate metrics
-    df = classify_transcripts(df, pc_ids, lnc_ids, keep_other=keep_other)
+    df = classify_transcripts(df, pc_ids, lnc_ids, version=False, keep_other=keep_other)
     df = calculate_lengths(df)
 
     # Aggregate per transcript

@@ -6,33 +6,27 @@
 # - Basic per-motif analysis with visualizations (parse_overlaps.py)
 # - Extended comprehensive analysis with statistical tests (new)
 
-import os
-from pathlib import Path
-
 # Configuration
 configfile: "config/config.yaml"
 configfile: "config/samples.yaml"
+configfile: "config/toy.yaml"
 
 # Global variables
 DATASETS = config.get("datasets", ["toy", "gencode.v47"])
 
-
-def get_feature_source(sample: str) -> str:
-    """Return 'exons' or 'full_transcripts' for a given sample (default: 'exons').
-
-    Both 'full_transcripts' and 'transcripts' are accepted in samples.yaml.
-    """
-    val = config.get("samples", {}).get(sample, {}).get("feature_source", "exons")
-    # Accept short alias 'transcripts' as well as the canonical 'full_transcripts'
-    if val == "transcripts":
-        val = "full_transcripts"
-    return val
-GFA_MOTIFS = ["APR", "DR", "g4Discovery", "IR", "MR", "STR", "TRI", "Z"]
+GFA_MOTIFS = ["APR", "DR", "g4Discovery_plus", "g4Discovery_minus", "IR", "MR", "STR", "TRI", "Z"]
+TOY_RESOURCE_PROVENANCE = (
+    "resources/toy/toy_provenance.yaml" if "toy" in DATASETS else []
+)
 
 # Include rule files
 include: "workflow/rules/common.smk"
+include: "workflow/rules/upstream.smk"
+include: "workflow/rules/toy.smk"
 include: "workflow/rules/extended_analysis.smk"
-#include: "workflow/rules/upstream.smk"
+
+# Check that all required resources are present before running the pipeline
+_resource_preflight(DATASETS)
 
 
 # ============================================================================
@@ -44,6 +38,7 @@ rule all:
     Default target: Run complete pipeline (basic + extended analysis).
     """
     input:
+        TOY_RESOURCE_PROVENANCE,
         # Basic analysis outputs
         expand(
             "results/{dataset}/transcript_gfa.{motif}_summary.tsv",
@@ -134,21 +129,26 @@ rule create_exons_bed:
 
 rule create_biotypes_from_fasta:
     """
-    Create biotypes TSV file from protein-coding and lncRNA FASTA files.
-    Extracts transcript IDs and assigns transcript_type based on source file.
+    Create biotypes TSV file from the configured annotation sources.
+    Toy annotations are read from GTF; full datasets use transcript FASTAs.
 
     Output format:
     - transcript_id_base: Transcript ID without version (e.g., ENST00000456328)
     - transcript_type: 'protein_coding' or 'lncRNA'
     """
     input:
+        gtf = lambda wildcards: (
+            config["samples"][wildcards.dataset]["gtf"]
+            if wildcards.dataset == "toy"
+            else []
+        ),
         coding_fasta = lambda wildcards: (
-            "results/pc_transcript_ids.txt"
+            []
             if wildcards.dataset == "toy"
             else "resources/gencode.v47.pc_transcripts.fa"
         ),
         lncRNA_fasta = lambda wildcards: (
-            "results/lncrna_transcript_ids.txt"
+            []
             if wildcards.dataset == "toy"
             else "resources/gencode.v47.lncRNA_transcripts.fa"
         ),
@@ -163,8 +163,15 @@ rule create_biotypes_from_fasta:
         {{
             echo -e "transcript_id_base\\ttranscript_type"
 
-            # Extract protein-coding transcript IDs and label them
-            if [[ -f {input.coding_fasta} ]]; then
+            if [[ "{wildcards.dataset}" == "toy" ]]; then
+                awk -F'\\t' '$3 == "transcript" {{
+                    match($9, /transcript_id "([^"]+)"/, transcript_id)
+                    match($9, /transcript_type "([^"]+)"/, transcript_type)
+                    if (transcript_id[1] != "" && transcript_type[1] != "")
+                        {{ split(transcript_id[1], id, "."); print id[1] "\\t" transcript_type[1] }}
+                }}' {input.gtf}
+            else
+                # Extract protein-coding transcript IDs and label them
                 if grep -q ">" {input.coding_fasta} 2>/dev/null; then
                     # It's a FASTA file
                     grep ">" {input.coding_fasta} | cut -d'|' -f 1 | sed 's/>//g' | \
@@ -173,10 +180,8 @@ rule create_biotypes_from_fasta:
                     # It's a plain ID list
                     awk '{{split($1, a, "."); print a[1] "\\tprotein_coding"}}' {input.coding_fasta}
                 fi
-            fi
 
-            # Extract lncRNA transcript IDs and label them
-            if [[ -f {input.lncRNA_fasta} ]]; then
+                # Extract lncRNA transcript IDs and label them
                 if grep -q ">" {input.lncRNA_fasta} 2>/dev/null; then
                     # It's a FASTA file
                     grep ">" {input.lncRNA_fasta} | cut -d'|' -f 1 | sed 's/>//g' | \
@@ -215,6 +220,39 @@ rule prepare_transcript_ids:
 # EXECUTION ORDER 2: Basic Analysis (Per-Motif)
 # ============================================================================
 
+rule basic_gtf_intersect:
+    """
+    Intersect annotation GTF with NBD motif BED for the basic analysis path.
+    Produces the 18-column (9 GTF + 9 BED) file that parse_overlaps.py expects.
+    """
+    input:
+        left = lambda wildcards: (
+            f"resources/{wildcards.dataset}/{wildcards.dataset}_chr22.gtf"
+            if wildcards.dataset == "toy"
+            else config["samples"].get(wildcards.dataset, {}).get(
+                "gtf", f"resources/{wildcards.dataset}.annotation.gtf"
+            )
+        ),
+        right = lambda wildcards: (
+            f"resources/toy/toy_{wildcards.motif_file}_chr22_clean.bed"
+            if wildcards.dataset == "toy"
+            else f"{_NBD}.{wildcards.motif_file}_clean.bed"
+        ),
+    output:
+        overlap = "results/{dataset}/isect_{motif_file}.bed",
+    params:
+        extra = "-wa -wb",
+    log:
+        "logs/{dataset}/basic_isect_{motif_file}.log",
+    resources:
+        mem_mb = 10000,
+        runtime = 60,
+    wildcard_constraints:
+        motif_file = r"g4Discovery(_plus|_minus)?|gfa\.(APR|DR|IR|MR|STR|TRI|Z)",
+    wrapper:
+        "v7.3.0/bio/bedtools/intersect"
+
+
 rule basic_motif_analysis:
     """
     Basic per-motif analysis using parse_overlaps.py.
@@ -234,7 +272,7 @@ rule basic_motif_analysis:
     log:
         "logs/{dataset}/basic_analysis_gfa.{motif}.log",
     conda:
-        "lnc-datasets"
+        "workflow/envs/nonb_analysis.yaml",
     threads: 1
     resources:
         mem_mb = 10000,

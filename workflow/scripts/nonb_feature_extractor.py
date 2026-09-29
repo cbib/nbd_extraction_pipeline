@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class NonBFeatureExtractor:
     """Extract comprehensive Non-B DNA features with vectorized operations."""
 
-    MOTIF_TYPES = ["APR", "DR", "GQ", "IR", "MR", "STR", "TRI", "Z"]
+    MOTIF_TYPES = ["APR", "DR", "GQ_PLUS", "GQ_MINUS", "IR", "MR", "STR", "TRI", "Z"]
 
     def __init__(
         self,
